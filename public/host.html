@@ -318,6 +318,10 @@ function startNewGame() {
       startBtn.innerText = '🚀 開始遊戲';
     }
 
+    // 🌟 保險 1：倒數一開始，立刻清空上一題的殘留內容與選項！
+    document.getElementById('q-title').innerText = '';
+    document.getElementById('options-container').innerHTML = '';
+
     document.getElementById('lobby-screen').style.display = 'none';
     document.getElementById('game-screen').style.display = 'grid';
     const overlay = document.getElementById('countdown-overlay');
@@ -346,7 +350,7 @@ function startNewGame() {
         step++;
         setTimeout(runStep, 1000);
       } else {
-        overlay.style.display = 'none';
+        // 🌟 保險 2：倒數結束時「不要急著關閉遮罩」，先跟伺服器索取新題目
         socket.emit('host_start_question');
       }
     }
@@ -355,6 +359,9 @@ function startNewGame() {
   });
 
   socket.on('question_start', (data) => {
+    // 🌟 保險 3：新題目資料已送達，此時才關閉倒數遮罩，無縫銜接新題目！
+    document.getElementById('countdown-overlay').style.display = 'none';
+
     document.getElementById('q-title').innerText = `第 ${data.index + 1}/${data.total} 題：${data.question}`;
     const optContainer = document.getElementById('options-container');
     optContainer.innerHTML = '';
