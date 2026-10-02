@@ -24,7 +24,14 @@
     .q-text { font-size: 18px; font-weight: bold; margin-bottom: 15px; }
     .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; flex-grow: 1; }
     .ans-btn { border: none; border-radius: 12px; font-size: 18px; font-weight: bold; color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 10px; cursor: pointer; }
-    .ans-btn img { max-height: 70px; max-width: 90%; border-radius: 6px; margin-bottom: 8px; }
+    .ans-btn img { 
+      max-height: 110px;           /* 手機按鈕圖片加大到 110px */
+      max-width: 90%; 
+      border-radius: 8px; 
+      margin-bottom: 8px; 
+      object-fit: contain; 
+      box-shadow: 0 4px 10px rgba(0,0,0,0.25);
+    }
     .btn-0 { background: #ef4444; }
     .btn-1 { background: #3b82f6; }
     .btn-2 { background: #eab308; }

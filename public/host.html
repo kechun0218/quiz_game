@@ -183,7 +183,15 @@
     /* ABCD 四選一卡片 */
     .options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; flex-grow: 1; }
     .opt-card { border-radius: 16px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 15px; font-size: 24px; font-weight: bold; position: relative; transition: all 0.3s; }
-    .opt-card img { max-height: 140px; max-width: 90%; border-radius: 8px; margin-bottom: 10px; object-fit: contain; }
+    .opt-card img { 
+      max-height: 230px;            /* 圖片最大高度拉大到 230px（可依需求改 200~260px） */
+      max-width: 92%;               /* 最大寬度維持自適應 */
+      border-radius: 12px; 
+      margin-bottom: 12px; 
+      object-fit: contain;          /* 保持原始比例不變形 */
+      box-shadow: 0 6px 16px rgba(0,0,0,0.3); /* 加點立體陰影 */
+      min-height: 0;
+    }
     .opt-0 { background: #ef4444; } /* A: 紅 */
     .opt-1 { background: #3b82f6; } /* B: 藍 */
     .opt-2 { background: #eab308; } /* C: 黃 */
@@ -209,7 +217,10 @@
 
   <!-- 1. 大廳頁面 -->
   <div id="lobby-screen">
-    <h1 style="font-size: 42px; margin-bottom: 30px;">🔥 互動答題挑戰賽 🔥</h1>
+    <h1 style="font-size: 38px; line-height: 1.4; text-align: center; margin-bottom: 30px; letter-spacing: 1px;">
+  桃園市就業服務商業同業公會<br>
+  <span style="font-size: 44px; color: #facc15; text-shadow: 0 0 20px rgba(250, 204, 21, 0.4);">🔥 互動答題挑戰賽 🔥</span>
+    </h1>
     <div class="lobby-box">
       <div class="qr-container">
       <!-- 改用 img 標籤，不依賴本機畫布 -->
