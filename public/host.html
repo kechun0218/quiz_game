@@ -61,6 +61,115 @@
   }
 }
 
+
+.podium-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex-grow: 1;
+  animation: fadeIn 0.8s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.podium-container {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 24px;
+  margin-top: 30px;
+  height: 380px;
+}
+
+.podium-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 150px;
+}
+
+.podium-player {
+  text-align: center;
+  min-height: 90px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  margin-bottom: 12px;
+}
+
+.podium-crown {
+  font-size: 38px;
+  line-height: 1;
+  filter: drop-shadow(0 0 10px rgba(250, 204, 21, 0.8));
+  animation: floatCrown 2s ease-in-out infinite;
+}
+
+@keyframes floatCrown {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+.podium-badge {
+  font-size: 26px;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.podium-name {
+  font-size: 22px;
+  font-weight: 900;
+  color: #ffffff;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.podium-score {
+  font-size: 16px;
+  color: #facc15;
+  font-weight: bold;
+  margin-top: 4px;
+}
+
+/* 頒獎台階柱體 */
+.podium-pillar {
+  width: 100%;
+  border-radius: 16px 16px 0 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 54px;
+  font-weight: 900;
+  color: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5);
+  border-top: 4px solid rgba(255, 255, 255, 0.4);
+}
+
+/* 金牌 (第一名) */
+.pillar-gold {
+  height: 200px;
+  background: linear-gradient(180deg, #f59e0b 0%, #b45309 100%);
+  box-shadow: 0 0 35px rgba(245, 158, 11, 0.5);
+}
+
+/* 銀牌 (第二名) */
+.pillar-silver {
+  height: 140px;
+  background: linear-gradient(180deg, #94a3b8 0%, #475569 100%);
+}
+
+/* 銅牌 (第三名) */
+.pillar-bronze {
+  height: 95px;
+  background: linear-gradient(180deg, #d97706 0%, #78350f 100%);
+}
+
     /* 3. 遊戲進行主畫面 */
     #game-screen { display: none; height: 100vh; grid-template-columns: 1fr 340px; }
     .main-area { display: flex; flex-direction: column; padding: 30px; height: 100%; position: relative; }
@@ -281,10 +390,57 @@ socket.on('start_pre_countdown', () => {
   }
 
   socket.on('game_finished', (top20) => {
-    document.querySelector('.main-area').innerHTML = `
-      <h1 style="font-size: 48px; text-align: center; margin-top: 100px;">🎉 遊戲結束！恭喜優勝者！ 🎉</h1>
-    `;
-  });
+    clearInterval(currentTimer);
+
+  // 確保右側排行榜顯示最新前 20 名
+  renderLeaderboard(top20);
+
+  // 取得前三名（若無人則以空字串保護）
+  const p1 = top20[0] || null;
+  const p2 = top20[1] || null;
+  const p3 = top20[2] || null;
+
+  const mainArea = document.querySelector('.main-area');
+  mainArea.innerHTML = `
+    <div class="podium-wrapper">
+      <h1 style="font-size: 42px; font-weight: 900; text-align: center; color: #facc15; text-shadow: 0 0 30px rgba(250, 204, 21, 0.5);">
+        🎉 遊戲結束！恭喜優勝者！ 🎉
+      </h1>
+
+      <div class="podium-container">
+        <!-- 亞軍 (第 2 名) -->
+        <div class="podium-col">
+          <div class="podium-player">
+            <span class="podium-badge">${p2 ? '🥈' : ''}</span>
+            <div class="podium-name">${p2 ? p2.name : ''}</div>
+            <div class="podium-score">${p2 ? p2.score + ' 分' : ''}</div>
+          </div>
+          <div class="podium-pillar pillar-silver">2</div>
+        </div>
+
+        <!-- 冠軍 (第 1 名) -->
+        <div class="podium-col">
+          <div class="podium-player">
+            <span class="podium-crown">${p1 ? '👑' : ''}</span>
+            <div class="podium-name" style="font-size: 26px; color: #facc15;">${p1 ? p1.name : ''}</div>
+            <div class="podium-score" style="font-size: 18px;">${p1 ? p1.score + ' 分' : ''}</div>
+          </div>
+          <div class="podium-pillar pillar-gold">1</div>
+        </div>
+
+        <!-- 季軍 (第 3 名) -->
+        <div class="podium-col">
+          <div class="podium-player">
+            <span class="podium-badge">${p3 ? '🥉' : ''}</span>
+            <div class="podium-name">${p3 ? p3.name : ''}</div>
+            <div class="podium-score">${p3 ? p3.score + ' 分' : ''}</div>
+          </div>
+          <div class="podium-pillar pillar-bronze">3</div>
+        </div>
+      </div>
+    </div>
+  `;
+});
 </script>
 </body>
 </html>
