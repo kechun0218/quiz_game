@@ -223,7 +223,7 @@
         <div id="lobby-players" style="margin-top: 15px;"></div>
       </div>
     </div>
-    <button class="btn" onclick="startCountdownCycle()" style="margin-top: 30px;">🚀 開始遊戲</button>
+    <button id="start-btn" class="btn" onclick="startCountdownCycle()" style="margin-top: 30px;">🚀 開始遊戲</button>
   </div>
 
   <!-- 2. 全螢幕 5-4-3-2-1 震撼倒數 -->
@@ -281,49 +281,69 @@
 
   // 啟動 54321 倒數
   function startCountdownCycle() {
-    document.getElementById('next-btn').style.display = 'none';
+    // 1. 檢查是否連線中
+    if (!socket.connected) {
+      alert('⚠️ 伺服器正在連線中，請稍候 3 秒後再試！');
+      return;
+    }
+
+    // 2. 停用按鈕，防止連點
+    const startBtn = document.getElementById('start-btn');
+    if (startBtn) {
+      startBtn.disabled = true;
+      startBtn.innerText = '準備中...';
+    }
+    const nextBtn = document.getElementById('next-btn');
+    if (nextBtn) {
+      nextBtn.style.display = 'none';
+    }
+
+    console.log("正在請求啟動倒數...");
     socket.emit('host_trigger_pre_countdown');
   }
 
-socket.on('start_pre_countdown', () => {
-  document.getElementById('lobby-screen').style.display = 'none';
-  document.getElementById('game-screen').style.display = 'grid';
-  const overlay = document.getElementById('countdown-overlay');
-  const numberEl = document.getElementById('anim-number');
-  overlay.style.display = 'flex';
-
-  const sequence = ['5', '4', '3', '2', '1', 'GO!'];
-  let step = 0;
-
-  function runStep() {
-    if (step < sequence.length) {
-      numberEl.innerText = sequence[step];
-
-      // 特效：如果是 "GO!"，字體變亮綠色
-      if (sequence[step] === 'GO!') {
-        numberEl.style.color = '#4ade80';
-        numberEl.style.textShadow = '0 0 50px #22c55e, 0 0 100px #16a34a';
-      } else {
-        numberEl.style.color = '#facc15';
-        numberEl.style.textShadow = '0 0 50px rgba(250, 204, 21, 0.9)';
-      }
-
-      // 🌟 關鍵：每次換字，強制瀏覽器重置並重新播放動畫
-      numberEl.classList.remove('animate-slam');
-      void numberEl.offsetWidth; // 觸發 reflow
-      numberEl.classList.add('animate-slam');
-
-      step++;
-      setTimeout(runStep, 1000); // 準確 1 秒一次
-    } else {
-      // 倒數結束，隱藏遮罩並開始題目
-      overlay.style.display = 'none';
-      socket.emit('host_start_question');
+  socket.on('start_pre_countdown', () => {
+    const startBtn = document.getElementById('start-btn');
+    if (startBtn) {
+      startBtn.disabled = false;
+      startBtn.innerText = '🚀 開始遊戲';
     }
-  }
 
-  runStep();
-});
+    document.getElementById('lobby-screen').style.display = 'none';
+    document.getElementById('game-screen').style.display = 'grid';
+    const overlay = document.getElementById('countdown-overlay');
+    const numberEl = document.getElementById('anim-number');
+    overlay.style.display = 'flex';
+
+    const sequence = ['5', '4', '3', '2', '1', 'GO!'];
+    let step = 0;
+
+    function runStep() {
+      if (step < sequence.length) {
+        numberEl.innerText = sequence[step];
+
+        if (sequence[step] === 'GO!') {
+          numberEl.style.color = '#4ade80';
+          numberEl.style.textShadow = '0 0 50px #22c55e, 0 0 100px #16a34a';
+        } else {
+          numberEl.style.color = '#facc15';
+          numberEl.style.textShadow = '0 0 50px rgba(250, 204, 21, 0.9)';
+        }
+
+        numberEl.classList.remove('animate-slam');
+        void numberEl.offsetWidth;
+        numberEl.classList.add('animate-slam');
+
+        step++;
+        setTimeout(runStep, 1000);
+      } else {
+        overlay.style.display = 'none';
+        socket.emit('host_start_question');
+      }
+    }
+
+    runStep();
+  });
 
   socket.on('question_start', (data) => {
     document.getElementById('q-title').innerText = `第 ${data.index + 1}/${data.total} 題：${data.question}`;
@@ -391,56 +411,67 @@ socket.on('start_pre_countdown', () => {
 
   socket.on('game_finished', (top20) => {
     clearInterval(currentTimer);
+    renderLeaderboard(top20);
 
-  // 確保右側排行榜顯示最新前 20 名
-  renderLeaderboard(top20);
+    const p1 = top20[0] || null;
+    const p2 = top20[1] || null;
+    const p3 = top20[2] || null;
 
-  // 取得前三名（若無人則以空字串保護）
-  const p1 = top20[0] || null;
-  const p2 = top20[1] || null;
-  const p3 = top20[2] || null;
+    const mainArea = document.querySelector('.main-area');
+    mainArea.innerHTML = `
+      <div class="podium-wrapper">
+        <h1 style="font-size: 40px; font-weight: 900; text-align: center; color: #facc15; text-shadow: 0 0 30px rgba(250, 204, 21, 0.5);">
+          🎉 遊戲結束！恭喜優勝者！ 🎉
+        </h1>
 
-  const mainArea = document.querySelector('.main-area');
-  mainArea.innerHTML = `
-    <div class="podium-wrapper">
-      <h1 style="font-size: 42px; font-weight: 900; text-align: center; color: #facc15; text-shadow: 0 0 30px rgba(250, 204, 21, 0.5);">
-        🎉 遊戲結束！恭喜優勝者！ 🎉
-      </h1>
-
-      <div class="podium-container">
-        <!-- 亞軍 (第 2 名) -->
-        <div class="podium-col">
-          <div class="podium-player">
-            <span class="podium-badge">${p2 ? '🥈' : ''}</span>
-            <div class="podium-name">${p2 ? p2.name : ''}</div>
-            <div class="podium-score">${p2 ? p2.score + ' 分' : ''}</div>
+        <div class="podium-container">
+          <!-- 亞軍 -->
+          <div class="podium-col">
+            <div class="podium-player">
+              <span class="podium-badge">${p2 ? '🥈' : ''}</span>
+              <div class="podium-name">${p2 ? p2.name : ''}</div>
+              <div class="podium-score">${p2 ? p2.score + ' 分' : ''}</div>
+            </div>
+            <div class="podium-pillar pillar-silver">2</div>
           </div>
-          <div class="podium-pillar pillar-silver">2</div>
+
+          <!-- 冠軍 -->
+          <div class="podium-col">
+            <div class="podium-player">
+              <span class="podium-crown">${p1 ? '👑' : ''}</span>
+              <div class="podium-name" style="font-size: 24px; color: #facc15;">${p1 ? p1.name : ''}</div>
+              <div class="podium-score" style="font-size: 18px;">${p1 ? p1.score + ' 分' : ''}</div>
+            </div>
+            <div class="podium-pillar pillar-gold">1</div>
+          </div>
+
+          <!-- 季軍 -->
+          <div class="podium-col">
+            <div class="podium-player">
+              <span class="podium-badge">${p3 ? '🥉' : ''}</span>
+              <div class="podium-name">${p3 ? p3.name : ''}</div>
+              <div class="podium-score">${p3 ? p3.score + ' 分' : ''}</div>
+            </div>
+            <div class="podium-pillar pillar-bronze">3</div>
+          </div>
         </div>
 
-        <!-- 冠軍 (第 1 名) -->
-        <div class="podium-col">
-          <div class="podium-player">
-            <span class="podium-crown">${p1 ? '👑' : ''}</span>
-            <div class="podium-name" style="font-size: 26px; color: #facc15;">${p1 ? p1.name : ''}</div>
-            <div class="podium-score" style="font-size: 18px;">${p1 ? p1.score + ' 分' : ''}</div>
-          </div>
-          <div class="podium-pillar pillar-gold">1</div>
-        </div>
-
-        <!-- 季軍 (第 3 名) -->
-        <div class="podium-col">
-          <div class="podium-player">
-            <span class="podium-badge">${p3 ? '🥉' : ''}</span>
-            <div class="podium-name">${p3 ? p3.name : ''}</div>
-            <div class="podium-score">${p3 ? p3.score + ' 分' : ''}</div>
-          </div>
-          <div class="podium-pillar pillar-bronze">3</div>
-        </div>
+        <!-- 再玩一場按鈕 -->
+        <button class="btn" style="margin-top: 35px; background: #10b981;" onclick="socket.emit('host_reset_to_lobby')">
+          🔄 結束並回大廳（再玩一輪）
+        </button>
       </div>
-    </div>
-  `;
-});
+    `;
+  });
+  // 🌟 回到大廳畫面事件
+  socket.on('back_to_lobby', (players) => {
+    document.getElementById('game-screen').style.display = 'none';
+    document.getElementById('lobby-screen').style.display = 'flex';
+    document.getElementById('player-count').innerText = players.length;
+    const container = document.getElementById('lobby-players');
+    container.innerHTML = players.map(p => `<span class="player-tag">${p.name}</span>`).join('');
+  });
+
 </script>
 </body>
 </html>

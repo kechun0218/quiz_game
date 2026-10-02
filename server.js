@@ -159,7 +159,20 @@ io.on('connection', (socket) => {
 
   // 主機發起開始每題前的 54321 倒數
   socket.on('host_trigger_pre_countdown', () => {
+    // 若遊戲已結束，或題號已到底，自動重置為新一輪遊戲
+    if (gameState.status === 'FINISHED' || gameState.currentQuestionIndex >= questions.length - 1) {
+      console.log('🔄 重置遊戲局數與題號...');
+      gameState.currentQuestionIndex = -1;
+      gameState.status = 'LOBBY';
+      // 保留大廳玩家，但將分數重置為 0
+      for (let id in gameState.players) {
+        gameState.players[id].score = 0;
+      }
+    }
+
     gameState.currentQuestionIndex++;
+
+    // 檢查是否真的超出題庫範圍
     if (gameState.currentQuestionIndex >= questions.length) {
       gameState.status = 'FINISHED';
       io.emit('game_finished', getTop20Leaderboard());
@@ -172,7 +185,19 @@ io.on('connection', (socket) => {
       gameState.players[id].lastAnswerCorrect = false;
     }
 
+    console.log(`▶️ 正在開始第 ${gameState.currentQuestionIndex + 1} 題倒數...`);
     io.emit('start_pre_countdown');
+  });
+
+  // 🌟 新增：由主機點擊「再玩一輪 / 回到大廳」事件
+  socket.on('host_reset_to_lobby', () => {
+    gameState.status = 'LOBBY';
+    gameState.currentQuestionIndex = -1;
+    for (let id in gameState.players) {
+      gameState.players[id].score = 0;
+      gameState.players[id].answered = false;
+    }
+    io.emit('back_to_lobby', Object.values(gameState.players));
   });
 
   // 主機發起開始題目作答
