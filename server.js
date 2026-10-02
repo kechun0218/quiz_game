@@ -158,21 +158,28 @@ io.on('connection', (socket) => {
   });
 
   // 主機發起開始每題前的 54321 倒數
-  socket.on('host_trigger_pre_countdown', () => {
-    // 若遊戲已結束，或題號已到底，自動重置為新一輪遊戲
-    if (gameState.status === 'FINISHED' || gameState.currentQuestionIndex >= questions.length - 1) {
-      console.log('🔄 重置遊戲局數與題號...');
-      gameState.currentQuestionIndex = -1;
-      gameState.status = 'LOBBY';
-      // 保留大廳玩家，但將分數重置為 0
-      for (let id in gameState.players) {
-        gameState.players[id].score = 0;
-      }
+  socket.on('host_start_game', () => {
+    console.log('🚀 開始全新一局遊戲！清空舊紀錄，分數全數歸零...');
+    gameState.status = 'PRE_COUNTDOWN';
+    gameState.currentQuestionIndex = 0; // 重回第一題
+
+    // 將所有在線玩家分數歸零、作答紀錄清空
+    for (let id in gameState.players) {
+      gameState.players[id].score = 0;
+      gameState.players[id].answered = false;
+      gameState.players[id].lastAnswerCorrect = false;
     }
 
+    // 即時把歸零後的排行榜與倒數推播出去
+    io.emit('leaderboard_update', getTop20Leaderboard());
+    io.emit('start_pre_countdown');
+  });
+
+  // 🌟 2. 遊戲進行中點「下一題」：正常累計分數、題號 +1
+  socket.on('host_next_question', () => {
     gameState.currentQuestionIndex++;
 
-    // 檢查是否真的超出題庫範圍
+    // 檢查是否所有題目都已結束
     if (gameState.currentQuestionIndex >= questions.length) {
       gameState.status = 'FINISHED';
       io.emit('game_finished', getTop20Leaderboard());
@@ -185,18 +192,14 @@ io.on('connection', (socket) => {
       gameState.players[id].lastAnswerCorrect = false;
     }
 
-    console.log(`▶️ 正在開始第 ${gameState.currentQuestionIndex + 1} 題倒數...`);
+    console.log(`▶️ 進入第 ${gameState.currentQuestionIndex + 1} 題`);
     io.emit('start_pre_countdown');
   });
 
-  // 🌟 新增：由主機點擊「再玩一輪 / 回到大廳」事件
+  // 🌟 3. 回到大廳（供頒獎台結束時點擊）
   socket.on('host_reset_to_lobby', () => {
     gameState.status = 'LOBBY';
     gameState.currentQuestionIndex = -1;
-    for (let id in gameState.players) {
-      gameState.players[id].score = 0;
-      gameState.players[id].answered = false;
-    }
     io.emit('back_to_lobby', Object.values(gameState.players));
   });
 

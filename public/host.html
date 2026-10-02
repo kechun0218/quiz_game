@@ -223,7 +223,7 @@
         <div id="lobby-players" style="margin-top: 15px;"></div>
       </div>
     </div>
-    <button id="start-btn" class="btn" onclick="startCountdownCycle()" style="margin-top: 30px;">🚀 開始遊戲</button>
+    <button id="start-btn" class="btn" onclick="startNewGame()" style="margin-top: 30px;">🚀 開始遊戲</button>
   </div>
 
   <!-- 2. 全螢幕 5-4-3-2-1 震撼倒數 -->
@@ -238,7 +238,7 @@
       <div id="q-title" class="question-box">題目載入中...</div>
       <div class="options-grid" id="options-container"></div>
       <div style="margin-top: 20px; display: flex; justify-content: flex-end;">
-        <button id="next-btn" class="btn" style="display:none;" onclick="startCountdownCycle()">下一題 ➔</button>
+        <button id="next-btn" class="btn" style="display:none;" onclick="nextQuestion()">下一題 ➔</button>
       </div>
     </div>
     <!-- 右側 TOP 20 排行榜 -->
@@ -279,27 +279,24 @@
     console.error("QR Code 產生失敗:", err);
   }
 
-  // 啟動 54321 倒數
-  function startCountdownCycle() {
-    // 1. 檢查是否連線中
+
+function startNewGame() {
     if (!socket.connected) {
-      alert('⚠️ 伺服器正在連線中，請稍候 3 秒後再試！');
+      alert('⚠️ 伺服器連線中，請稍候 3 秒後再試！');
       return;
     }
-
-    // 2. 停用按鈕，防止連點
     const startBtn = document.getElementById('start-btn');
     if (startBtn) {
       startBtn.disabled = true;
       startBtn.innerText = '準備中...';
     }
-    const nextBtn = document.getElementById('next-btn');
-    if (nextBtn) {
-      nextBtn.style.display = 'none';
-    }
+    socket.emit('host_start_game');
+  }
 
-    console.log("正在請求啟動倒數...");
-    socket.emit('host_trigger_pre_countdown');
+  // 🌟 題目結束時按下一題：保留分數繼續累加
+  function nextQuestion() {
+    document.getElementById('next-btn').style.display = 'none';
+    socket.emit('host_next_question');
   }
 
   socket.on('start_pre_countdown', () => {
