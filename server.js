@@ -142,19 +142,31 @@ io.on('connection', (socket) => {
   socket.emit('player_list_update', Object.values(gameState.players));
 
   // 玩家加入大廳
-  socket.on('join_game', (nickname) => {
+  socket.on('join_game', (rawNickname) => {
+    let baseName = (rawNickname || '無名氏').trim().slice(0, 10);
+    if (!baseName) baseName = '無名氏';
+
+    // 檢查現有名單是否有重複
+    const existingNames = Object.values(gameState.players).map(p => p.name);
+    let finalName = baseName;
+    let count = 1;
+    while (existingNames.includes(finalName)) {
+      finalName = `${baseName} (${count})`;
+      count++;
+    }
+
     gameState.players[socket.id] = {
       id: socket.id,
-      name: nickname || '無名氏',
+      name: finalName,
       score: 0,
       answered: false,
       lastAnswerCorrect: false
     };
-    socket.emit('joined_success', { name: nickname });
-    
-    // 廣播給包含主機在內的所有人更新大廳
+
+    // 回傳分配好的最終暱稱給手機端（例如手機會收到「你好，小明 (1)！」）
+    socket.emit('joined_success', { name: finalName });
     io.emit('player_list_update', Object.values(gameState.players));
-    console.log(`[玩家加入] ${nickname} (目前共 ${Object.keys(gameState.players).length} 人)`);
+    console.log(`[玩家加入] ${finalName} (目前在線 ${Object.keys(gameState.players).length} 人)`);
   });
 
   // 主機發起開始每題前的 54321 倒數
@@ -175,14 +187,34 @@ io.on('connection', (socket) => {
     io.emit('start_pre_countdown');
   });
 
+
+  function finishGame() {
+    gameState.status = 'FINISHED';
+    const allSorted = Object.values(gameState.players).sort((a, b) => b.score - a.score);
+
+    // 1. 給大螢幕前 20 名（產生頒獎台與右側排行榜）
+    io.emit('game_finished', allSorted.slice(0, 20));
+
+    // 2. 🌟 個別通知每支手機專屬的名次與得分憑證
+    allSorted.forEach((p, index) => {
+      io.to(p.id).emit('player_final_result', {
+        rank: index + 1,
+        score: p.score,
+        name: p.name,
+        total: allSorted.length
+      });
+    });
+    console.log('🏁 遊戲結束，已將個人名次憑證發送至所有玩家手機！');
+  }
+
+
+
   // 🌟 2. 遊戲進行中點「下一題」：正常累計分數、題號 +1
   socket.on('host_next_question', () => {
     gameState.currentQuestionIndex++;
 
-    // 檢查是否所有題目都已結束
     if (gameState.currentQuestionIndex >= questions.length) {
-      gameState.status = 'FINISHED';
-      io.emit('game_finished', getTop20Leaderboard());
+      finishGame();
       return;
     }
 

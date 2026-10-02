@@ -16,6 +16,26 @@
     /* 按鈕共用樣式 */
     .btn { background: #3b82f6; color: white; border: none; padding: 15px; font-size: 20px; font-weight: bold; border-radius: 8px; cursor: pointer; }
     
+
+    /* 個人領獎憑證卡片樣式 */
+    .award-card {
+      background: linear-gradient(135deg, #1e293b, #0f172a);
+      border: 2px solid #facc15;
+      border-radius: 16px;
+      padding: 30px 20px;
+      text-align: center;
+      box-shadow: 0 0 35px rgba(250, 204, 21, 0.35);
+      width: 100%;
+      box-sizing: border-box;
+      animation: popIn 0.5s ease-out;
+    }
+    @keyframes popIn {
+      0% { transform: scale(0.85); opacity: 0; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    .award-rank { font-size: 52px; font-weight: 900; color: #facc15; margin: 15px 0; }
+
+
     /* 等待畫面 */
     #status-screen { display: none; height: 100%; flex-direction: column; justify-content: center; align-items: center; text-align: center; font-size: 24px; font-weight: bold; }
 
@@ -112,8 +132,46 @@
       showStatus('作答結束！請查看大螢幕排行榜');
     });
 
-    socket.on('game_finished', () => {
-      showStatus('🏁 遊戲結束！感謝參與！');
+    socket.on('player_final_result', (data) => {
+      document.getElementById('question-screen').style.display = 'none';
+      const status = document.getElementById('status-screen');
+      status.style.display = 'flex';
+
+      let medal = '🎖️';
+      let title = '感謝熱情參與！';
+      let hint = '本輪挑戰結束，請看大螢幕頒獎';
+
+      if (data.rank === 1) {
+        medal = '👑 冠軍';
+        title = '恭喜榮獲 第 1 名！';
+        hint = '🎉 請立即出示此手機畫面給工作人員領取大獎！';
+      } else if (data.rank === 2) {
+        medal = '🥈 亞軍';
+        title = '恭喜榮獲 第 2 名！';
+        hint = '🎉 請出示此手機畫面給工作人員領獎！';
+      } else if (data.rank === 3) {
+        medal = '🥉 季軍';
+        title = '恭喜榮獲 第 3 名！';
+        hint = '🎉 請出示此手機畫面給工作人員領獎！';
+      } else if (data.rank <= 10) {
+        medal = '🌟 前十強';
+        title = `恭喜榮獲 第 ${data.rank} 名！`;
+        hint = '表現相當優異！';
+      } else {
+        medal = `第 ${data.rank} 名`;
+      }
+
+      status.innerHTML = `
+        <div class="award-card">
+          <div style="font-size: 22px; font-weight: bold; color: #38bdf8;">${data.name}</div>
+          <div class="award-rank">${medal}</div>
+          <div style="font-size: 22px; font-weight: bold; margin-bottom: 8px; color: #fff;">${title}</div>
+          <div style="font-size: 16px; color: #cbd5e1; margin-bottom: 20px;">總得分：<span style="color:#facc15; font-weight:bold; font-size:18px;">${data.score}</span> 分</div>
+          <div style="font-size: 14px; color: #facc15; font-weight: bold; border-top: 1px dashed #475569; padding-top: 15px; line-height: 1.5;">
+            ${hint}
+          </div>
+        </div>
+      `;
     });
 
     function showStatus(html) {
