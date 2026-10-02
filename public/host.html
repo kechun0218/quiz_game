@@ -19,20 +19,47 @@
     .player-tag { display: inline-block; background: #3b82f6; padding: 8px 15px; margin: 5px; border-radius: 20px; font-weight: bold; }
 
     /* 2. 全螢幕 5-4-3-2-1 緊張倒數動畫 */
-    #countdown-overlay {
-      position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-      background: radial-gradient(circle, #3b82f6 0%, #000 80%);
-      display: none; align-items: center; justify-content: center; z-index: 999;
-    }
-    .pop-anim {
-      font-size: 180px; font-weight: 900; color: #facc15; text-shadow: 0 0 40px #facc15;
-      animation: pop 0.9s cubic-bezier(0.175, 0.885, 0.32, 1.275) infinite;
-    }
-    @keyframes pop {
-      0% { transform: scale(0.3); opacity: 0; }
-      50% { transform: scale(1.1); opacity: 1; }
-      100% { transform: scale(1); opacity: 0; }
-    }
+#countdown-overlay {
+  position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+  background: radial-gradient(circle, rgba(30, 58, 138, 0.96) 0%, rgba(15, 23, 42, 0.98) 100%);
+  display: none; align-items: center; justify-content: center; z-index: 999;
+}
+
+/* 數字基本樣式 */
+.countdown-number {
+  font-size: 220px;
+  font-weight: 900;
+  color: #facc15;
+  text-shadow: 0 0 50px rgba(250, 204, 21, 0.9), 0 0 100px rgba(234, 179, 8, 0.5);
+  user-select: none;
+}
+
+/* 每次換數字觸發一次「砸向螢幕」衝擊動畫 */
+.animate-slam {
+  animation: slamEffect 0.95s cubic-bezier(0.2, 0.9, 0.3, 1) forwards;
+}
+
+@keyframes slamEffect {
+  0% {
+    transform: scale(3.5);
+    opacity: 0;
+    filter: blur(12px);
+  }
+  25% {
+    transform: scale(1);
+    opacity: 1;
+    filter: blur(0);
+  }
+  75% {
+    transform: scale(1.05);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0.6);
+    opacity: 0;
+    filter: blur(6px);
+  }
+}
 
     /* 3. 遊戲進行主畫面 */
     #game-screen { display: none; height: 100vh; grid-template-columns: 1fr 340px; }
@@ -91,9 +118,9 @@
   </div>
 
   <!-- 2. 全螢幕 5-4-3-2-1 震撼倒數 -->
-  <div id="countdown-overlay">
-    <div id="anim-number" class="pop-anim">5</div>
-  </div>
+<div id="countdown-overlay">
+  <div id="anim-number" class="countdown-number"></div>
+</div>
 
   <!-- 3. 主遊戲與排行榜頁面 -->
   <div id="game-screen">
@@ -149,27 +176,45 @@
     socket.emit('host_trigger_pre_countdown');
   }
 
-  socket.on('start_pre_countdown', () => {
-    document.getElementById('lobby-screen').style.display = 'none';
-    document.getElementById('game-screen').style.display = 'grid';
-    const overlay = document.getElementById('countdown-overlay');
-    const numberEl = document.getElementById('anim-number');
-    overlay.style.display = 'flex';
+socket.on('start_pre_countdown', () => {
+  document.getElementById('lobby-screen').style.display = 'none';
+  document.getElementById('game-screen').style.display = 'grid';
+  const overlay = document.getElementById('countdown-overlay');
+  const numberEl = document.getElementById('anim-number');
+  overlay.style.display = 'flex';
 
-    let count = 5;
-    numberEl.innerText = count;
+  const sequence = ['5', '4', '3', '2', '1', 'GO!'];
+  let step = 0;
 
-    const interval = setInterval(() => {
-      count--;
-      if (count > 0) {
-        numberEl.innerText = count;
+  function runStep() {
+    if (step < sequence.length) {
+      numberEl.innerText = sequence[step];
+
+      // 特效：如果是 "GO!"，字體變亮綠色
+      if (sequence[step] === 'GO!') {
+        numberEl.style.color = '#4ade80';
+        numberEl.style.textShadow = '0 0 50px #22c55e, 0 0 100px #16a34a';
       } else {
-        clearInterval(interval);
-        overlay.style.display = 'none';
-        socket.emit('host_start_question');
+        numberEl.style.color = '#facc15';
+        numberEl.style.textShadow = '0 0 50px rgba(250, 204, 21, 0.9)';
       }
-    }, 1000);
-  });
+
+      // 🌟 關鍵：每次換字，強制瀏覽器重置並重新播放動畫
+      numberEl.classList.remove('animate-slam');
+      void numberEl.offsetWidth; // 觸發 reflow
+      numberEl.classList.add('animate-slam');
+
+      step++;
+      setTimeout(runStep, 1000); // 準確 1 秒一次
+    } else {
+      // 倒數結束，隱藏遮罩並開始題目
+      overlay.style.display = 'none';
+      socket.emit('host_start_question');
+    }
+  }
+
+  runStep();
+});
 
   socket.on('question_start', (data) => {
     document.getElementById('q-title').innerText = `第 ${data.index + 1}/${data.total} 題：${data.question}`;
