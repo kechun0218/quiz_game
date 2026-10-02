@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>玩家手機答題端</title>
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: sans-serif; }
+    body { background: #0f172a; color: white; display: flex; flex-direction: column; height: 100vh; padding: 15px; }
+
+    /* 登入視窗 */
+    #join-box { display: flex; flex-direction: column; justify-content: center; height: 100%; gap: 15px; }
+    input { padding: 15px; font-size: 18px; border-radius: 8px; border: none; }
+    
+    /* 按鈕共用樣式 */
+    .btn { background: #3b82f6; color: white; border: none; padding: 15px; font-size: 20px; font-weight: bold; border-radius: 8px; cursor: pointer; }
+    
+    /* 等待畫面 */
+    #status-screen { display: none; height: 100%; flex-direction: column; justify-content: center; align-items: center; text-align: center; font-size: 24px; font-weight: bold; }
+
+    /* 手機作答區 (2x2 大按鈕) */
+    #question-screen { display: none; height: 100%; flex-direction: column; }
+    .q-text { font-size: 18px; font-weight: bold; margin-bottom: 15px; }
+    .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; flex-grow: 1; }
+    .ans-btn { border: none; border-radius: 12px; font-size: 18px; font-weight: bold; color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 10px; cursor: pointer; }
+    .ans-btn img { max-height: 70px; max-width: 90%; border-radius: 6px; margin-bottom: 8px; }
+    .btn-0 { background: #ef4444; }
+    .btn-1 { background: #3b82f6; }
+    .btn-2 { background: #eab308; }
+    .btn-3 { background: #10b981; }
+  </style>
+</head>
+<body>
+
+  <!-- 1. 加入頁面 -->
+  <div id="join-box">
+    <h2 style="text-align: center;">🎮 加入遊戲</h2>
+    <input type="text" id="nickname" placeholder="請輸入你的暱稱..." maxlength="10">
+    <button class="btn" onclick="joinGame()">確認進入</button>
+  </div>
+
+  <!-- 2. 等待/結果畫面 -->
+  <div id="status-screen">
+    <p id="status-msg">請看大螢幕準備...</p>
+  </div>
+
+  <!-- 3. 手機作答介面 -->
+  <div id="question-screen">
+    <div class="q-text" id="m-question"></div>
+    <div class="btn-grid" id="m-options"></div>
+  </div>
+
+  <script>
+    const socket = io();
+
+    function joinGame() {
+      const name = document.getElementById('nickname').value.trim();
+      if (!name) return alert('請輸入暱稱！');
+      socket.emit('join_game', name);
+    }
+
+    socket.on('joined_success', (data) => {
+      document.getElementById('join-box').style.display = 'none';
+      showStatus(`你好，${data.name}！<br>已在大廳，等待主機開始...`);
+    });
+
+    socket.on('start_pre_countdown', () => {
+      showStatus('準備好了嗎？<br>即將開始倒數！');
+    });
+
+    // 題目開始
+    socket.on('question_start', (data) => {
+      document.getElementById('status-screen').style.display = 'none';
+      const qScreen = document.getElementById('question-screen');
+      qScreen.style.display = 'flex';
+
+      document.getElementById('m-question').innerText = `Q${data.index + 1}: ${data.question}`;
+      const optContainer = document.getElementById('m-options');
+      optContainer.innerHTML = '';
+
+      const labels = ['A', 'B', 'C', 'D'];
+      data.options.forEach((opt, idx) => {
+        const btn = document.createElement('button');
+        btn.className = `ans-btn btn-${idx}`;
+        btn.innerHTML = `
+          ${opt.img ? `<img src="${opt.img}">` : ''}
+          <span>${labels[idx]}. ${opt.text}</span>
+        `;
+        btn.onclick = () => submitAnswer(idx);
+        optContainer.appendChild(btn);
+      });
+    });
+
+    function submitAnswer(idx) {
+      socket.emit('submit_answer', idx);
+      showStatus('答案已送出！<br>請看大螢幕等待結果...');
+    }
+
+    socket.on('answer_received', (res) => {
+      // 答案送達確認
+    });
+
+    socket.on('answer_reveal', (data) => {
+      showStatus('作答結束！請查看大螢幕排行榜');
+    });
+
+    socket.on('game_finished', () => {
+      showStatus('🏁 遊戲結束！感謝參與！');
+    });
+
+    function showStatus(html) {
+      document.getElementById('question-screen').style.display = 'none';
+      const status = document.getElementById('status-screen');
+      status.style.display = 'flex';
+      document.getElementById('status-msg').innerHTML = html;
+    }
+  </script>
+</body>
+</html>

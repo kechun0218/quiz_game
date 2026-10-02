@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <title>互動問答大螢幕 (Host View)</title>
+  <script src="/socket.io/socket.io.js"></script>
+  <!-- 引入 QR code 產生器 -->
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    body { background: #121826; color: #fff; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+    
+    /* 1. 大廳頁面 */
+    #lobby-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; }
+    .lobby-box { display: flex; gap: 50px; background: #1f2937; padding: 40px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+    .qr-container { display: flex; flex-direction: column; align-items: center; }
+    #qrcode { background: white; padding: 15px; border-radius: 12px; }
+    .player-list-box { width: 350px; max-height: 400px; overflow-y: auto; }
+    .player-tag { display: inline-block; background: #3b82f6; padding: 8px 15px; margin: 5px; border-radius: 20px; font-weight: bold; }
+
+    /* 2. 全螢幕 5-4-3-2-1 緊張倒數動畫 */
+    #countdown-overlay {
+      position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+      background: radial-gradient(circle, #3b82f6 0%, #000 80%);
+      display: none; align-items: center; justify-content: center; z-index: 999;
+    }
+    .pop-anim {
+      font-size: 180px; font-weight: 900; color: #facc15; text-shadow: 0 0 40px #facc15;
+      animation: pop 0.9s cubic-bezier(0.175, 0.885, 0.32, 1.275) infinite;
+    }
+    @keyframes pop {
+      0% { transform: scale(0.3); opacity: 0; }
+      50% { transform: scale(1.1); opacity: 1; }
+      100% { transform: scale(1); opacity: 0; }
+    }
+
+    /* 3. 遊戲進行主畫面 */
+    #game-screen { display: none; height: 100vh; grid-template-columns: 1fr 340px; }
+    .main-area { display: flex; flex-direction: column; padding: 30px; height: 100%; position: relative; }
+    
+    /* 計時進度條 */
+    .timer-container { width: 100%; height: 16px; background: #374151; border-radius: 8px; overflow: hidden; margin-bottom: 20px; }
+    #timer-bar { width: 100%; height: 100%; background: #10b981; transition: width 0.1s linear, background 0.3s; }
+
+    .question-box { font-size: 28px; font-weight: bold; margin-bottom: 20px; min-height: 80px; }
+    
+    /* ABCD 四選一卡片 */
+    .options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; flex-grow: 1; }
+    .opt-card { border-radius: 16px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 15px; font-size: 24px; font-weight: bold; position: relative; transition: all 0.3s; }
+    .opt-card img { max-height: 140px; max-width: 90%; border-radius: 8px; margin-bottom: 10px; object-fit: contain; }
+    .opt-0 { background: #ef4444; } /* A: 紅 */
+    .opt-1 { background: #3b82f6; } /* B: 藍 */
+    .opt-2 { background: #eab308; } /* C: 黃 */
+    .opt-3 { background: #10b981; } /* D: 綠 */
+    .correct-highlight { box-shadow: 0 0 0 8px #ffffff, 0 0 40px #10b981; transform: scale(1.03); z-index: 10; }
+    .dimmed { opacity: 0.25; filter: grayscale(80%); }
+
+    /* 4. 右側排行榜 (Top 20) */
+    .leaderboard-panel { background: #1f2937; border-left: 2px solid #374151; padding: 20px; display: flex; flex-direction: column; }
+    .leaderboard-title { font-size: 20px; font-weight: bold; margin-bottom: 15px; color: #facc15; }
+    .lb-list { overflow-y: auto; flex-grow: 1; list-style: none; }
+    .lb-item { display: flex; justify-content: space-between; padding: 8px 12px; margin-bottom: 6px; background: #2d3748; border-radius: 8px; font-size: 14px; }
+    .lb-item:nth-child(1) { background: #d97706; font-weight: bold; }
+    .lb-item:nth-child(2) { background: #4b5563; font-weight: bold; }
+    .lb-item:nth-child(3) { background: #78350f; font-weight: bold; }
+
+    /* 按鈕樣式 */
+    .btn { background: #8b5cf6; color: white; border: none; padding: 12px 28px; border-radius: 10px; font-size: 18px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+    .btn:hover { background: #7c3aed; }
+  </style>
+</head>
+<body>
+
+  <!-- 1. 大廳頁面 -->
+  <div id="lobby-screen">
+    <h1 style="font-size: 42px; margin-bottom: 30px;">🔥 互動答題挑戰賽 🔥</h1>
+    <div class="lobby-box">
+      <div class="qr-container">
+        <canvas id="qrcode"></canvas>
+        <p style="margin-top: 15px; font-size: 18px;">請手機掃描 QR Code 進入</p>
+      </div>
+      <div class="player-list-box">
+        <h3>已加入玩家 (<span id="player-count">0</span>):</h3>
+        <div id="lobby-players" style="margin-top: 15px;"></div>
+      </div>
+    </div>
+    <button class="btn" onclick="startCountdownCycle()" style="margin-top: 30px;">🚀 開始遊戲</button>
+  </div>
+
+  <!-- 2. 全螢幕 5-4-3-2-1 震撼倒數 -->
+  <div id="countdown-overlay">
+    <div id="anim-number" class="pop-anim">5</div>
+  </div>
+
+  <!-- 3. 主遊戲與排行榜頁面 -->
+  <div id="game-screen">
+    <div class="main-area">
+      <div class="timer-container"><div id="timer-bar"></div></div>
+      <div id="q-title" class="question-box">題目載入中...</div>
+      <div class="options-grid" id="options-container"></div>
+      <div style="margin-top: 20px; display: flex; justify-content: flex-end;">
+        <button id="next-btn" class="btn" style="display:none;" onclick="startCountdownCycle()">下一題 ➔</button>
+      </div>
+    </div>
+    <!-- 右側 TOP 20 排行榜 -->
+    <div class="leaderboard-panel">
+      <div class="leaderboard-title">🏆 即時排行榜 TOP 20</div>
+      <ul class="lb-list" id="leaderboard-list"></ul>
+    </div>
+  </div>
+
+ <script>
+  const socket = io();
+  let currentTimer = null;
+
+  // 🌟 1. 優先綁定名單更新事件（無論何時收到名單都會立刻畫出來）
+  socket.on('player_list_update', (players) => {
+    console.log("收到最新名單:", players);
+    document.getElementById('player-count').innerText = players.length;
+    const container = document.getElementById('lobby-players');
+    container.innerHTML = players.map(p => `<span class="player-tag">${p.name}</span>`).join('');
+  });
+
+  // 🌟 2. 安全生成 QR Code (若 CDN 失敗不影響名單顯示)
+  try {
+    const joinUrl = `${window.location.protocol}//${window.location.host}/player.html`;
+    if (typeof QRCode !== 'undefined') {
+      QRCode.toCanvas(document.getElementById('qrcode'), joinUrl, { width: 220 });
+    } else {
+      console.warn("QRCode 模組未載入");
+    }
+  } catch (err) {
+    console.error("QR Code 產生失敗:", err);
+  }
+
+  // 啟動 54321 倒數
+  function startCountdownCycle() {
+    document.getElementById('next-btn').style.display = 'none';
+    socket.emit('host_trigger_pre_countdown');
+  }
+
+  socket.on('start_pre_countdown', () => {
+    document.getElementById('lobby-screen').style.display = 'none';
+    document.getElementById('game-screen').style.display = 'grid';
+    const overlay = document.getElementById('countdown-overlay');
+    const numberEl = document.getElementById('anim-number');
+    overlay.style.display = 'flex';
+
+    let count = 5;
+    numberEl.innerText = count;
+
+    const interval = setInterval(() => {
+      count--;
+      if (count > 0) {
+        numberEl.innerText = count;
+      } else {
+        clearInterval(interval);
+        overlay.style.display = 'none';
+        socket.emit('host_start_question');
+      }
+    }, 1000);
+  });
+
+  socket.on('question_start', (data) => {
+    document.getElementById('q-title').innerText = `第 ${data.index + 1}/${data.total} 題：${data.question}`;
+    const optContainer = document.getElementById('options-container');
+    optContainer.innerHTML = '';
+
+    const labels = ['A', 'B', 'C', 'D'];
+    data.options.forEach((opt, idx) => {
+      const div = document.createElement('div');
+      div.className = `opt-card opt-${idx}`;
+      div.id = `opt-${idx}`;
+      div.innerHTML = `
+        ${opt.img ? `<img src="${opt.img}" alt="選項圖片">` : ''}
+        <div>${labels[idx]}. ${opt.text}</div>
+      `;
+      optContainer.appendChild(div);
+    });
+
+    const bar = document.getElementById('timer-bar');
+    bar.style.width = '100%';
+    bar.style.background = '#10b981';
+
+    let timeLeft = data.timeLimit;
+    const totalTime = data.timeLimit;
+    clearInterval(currentTimer);
+
+    currentTimer = setInterval(() => {
+      timeLeft -= 0.1;
+      const pct = Math.max(0, (timeLeft / totalTime) * 100);
+      bar.style.width = `${pct}%`;
+      if (pct < 30) bar.style.background = '#ef4444';
+
+      if (timeLeft <= 0) {
+        clearInterval(currentTimer);
+        socket.emit('host_reveal_answer');
+      }
+    }, 100);
+  });
+
+  socket.on('answer_reveal', (data) => {
+    clearInterval(currentTimer);
+    for (let i = 0; i < 4; i++) {
+      const card = document.getElementById(`opt-${i}`);
+      if (card) {
+        if (i === data.correctIndex) {
+          card.classList.add('correct-highlight');
+        } else {
+          card.classList.add('dimmed');
+        }
+      }
+    }
+    document.getElementById('next-btn').style.display = 'block';
+  });
+
+  socket.on('leaderboard_update', renderLeaderboard);
+  function renderLeaderboard(top20) {
+    const list = document.getElementById('leaderboard-list');
+    list.innerHTML = top20.map((p, i) => `
+      <li class="lb-item">
+        <span>#${i + 1} ${p.name}</span>
+        <span>${p.score} 分</span>
+      </li>
+    `).join('');
+  }
+
+  socket.on('game_finished', (top20) => {
+    document.querySelector('.main-area').innerHTML = `
+      <h1 style="font-size: 48px; text-align: center; margin-top: 100px;">🎉 遊戲結束！恭喜優勝者！ 🎉</h1>
+    `;
+  });
+</script>
+</body>
+</html>
