@@ -218,10 +218,10 @@ io.on('connection', (socket) => {
     });
   });
 
-  // 記錄主控台的 socket id
-  let hostSocketId = null;
+
   socket.on('register_as_host', () => {
-    hostSocketId = socket.id;
+    socket.join('host_room');
+    console.log('🖥️ 主控大螢幕已加入 host_room');
   });
 
   // 🌟 最佳化後的作答邏輯（避免 40,000 次廣播風暴）
@@ -237,17 +237,19 @@ io.on('connection', (socket) => {
     if (isCorrect) {
       const timeSpent = (Date.now() - gameState.questionStartTime) / 1000;
       const timeLeft = Math.max(0, q.timeLimit - timeSpent);
+      // 分數計算：答對保底 200 分，越快越高，最高 1000 分
       const points = Math.round(200 + 800 * (timeLeft / q.timeLimit));
       player.score += points;
+      console.log(`✅ [${player.name}] 答對！獲得 ${points} 分，目前總分：${player.score}`);
+    } else {
+      console.log(`❌ [${player.name}] 答錯！目前總分：${player.score}`);
     }
 
-    // 1. 只回傳結果給「作答的該名玩家」
+    // 1. 回傳結果給作答的該名玩家
     socket.emit('answer_received', { isCorrect });
 
-    // 2. 🌟 關鍵優化：排行榜只傳給大螢幕（Host），不要廣播給 200 支手機！
-    if (hostSocketId) {
-      io.to(hostSocketId).emit('leaderboard_update', getTop20Leaderboard());
-    }
+    // 2. 🌟 關鍵修正：直接推送給 host_room 房間的大螢幕！
+    io.to('host_room').emit('leaderboard_update', getTop20Leaderboard());
   });
 
   // 主機公布答案

@@ -383,6 +383,12 @@ function startNewGame() {
 
   socket.on('answer_reveal', (data) => {
     clearInterval(currentTimer);
+    
+    // 🌟 雙重保險：答案揭曉時強制再更新一次最新排行榜
+    if (data.leaderboard) {
+      renderLeaderboard(data.leaderboard);
+    }
+
     for (let i = 0; i < 4; i++) {
       const card = document.getElementById(`opt-${i}`);
       if (card) {
