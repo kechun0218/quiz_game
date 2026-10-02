@@ -76,8 +76,11 @@
     <h1 style="font-size: 42px; margin-bottom: 30px;">🔥 互動答題挑戰賽 🔥</h1>
     <div class="lobby-box">
       <div class="qr-container">
-        <canvas id="qrcode"></canvas>
-        <p style="margin-top: 15px; font-size: 18px;">請手機掃描 QR Code 進入</p>
+      <!-- 改用 img 標籤，不依賴本機畫布 -->
+        <img id="qrcode-img" src="" alt="QR Code 載入中..." style="width: 220px; height: 220px; background: white; padding: 10px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
+        <p style="margin-top: 15px; font-size: 18px; font-weight: bold;">請手機掃描 QR Code 進入</p>
+        <!-- 備用：若手機相機壞掉，可直接看網址輸入 -->
+        <p style="margin-top: 6px; font-size: 14px; color: #94a3b8;">或直接在手機網址列輸入：<br><span id="join-url-text" style="color: #60a5fa; font-weight: bold;"></span></p>
       </div>
       <div class="player-list-box">
         <h3>已加入玩家 (<span id="player-count">0</span>):</h3>
@@ -123,12 +126,19 @@
 
   // 🌟 2. 安全生成 QR Code (若 CDN 失敗不影響名單顯示)
   try {
-    const joinUrl = `${window.location.protocol}//${window.location.host}/player.html`;
-    if (typeof QRCode !== 'undefined') {
-      QRCode.toCanvas(document.getElementById('qrcode'), joinUrl, { width: 220 });
-    } else {
-      console.warn("QRCode 模組未載入");
-    }
+	const joinUrl = `${window.location.protocol}//${window.location.host}/player.html`;
+
+	// 1. 自動帶出 QR Code 圖片
+	const qrImg = document.getElementById('qrcode-img');
+	if (qrImg) {
+	  qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(joinUrl)}`;
+	}
+
+	// 2. 顯示文字連結供手動輸入
+	const urlText = document.getElementById('join-url-text');
+	if (urlText) {
+	  urlText.innerText = joinUrl.replace('https://', '').replace('http://', '');
+	}
   } catch (err) {
     console.error("QR Code 產生失敗:", err);
   }
