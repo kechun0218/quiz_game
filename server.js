@@ -218,7 +218,13 @@ io.on('connection', (socket) => {
     });
   });
 
-  // 玩家作答
+  // 記錄主控台的 socket id
+  let hostSocketId = null;
+  socket.on('register_as_host', () => {
+    hostSocketId = socket.id;
+  });
+
+  // 🌟 最佳化後的作答邏輯（避免 40,000 次廣播風暴）
   socket.on('submit_answer', (selectedIndex) => {
     const player = gameState.players[socket.id];
     if (!player || player.answered || gameState.status !== 'QUESTION') return;
@@ -235,8 +241,13 @@ io.on('connection', (socket) => {
       player.score += points;
     }
 
+    // 1. 只回傳結果給「作答的該名玩家」
     socket.emit('answer_received', { isCorrect });
-    io.emit('leaderboard_update', getTop20Leaderboard());
+
+    // 2. 🌟 關鍵優化：排行榜只傳給大螢幕（Host），不要廣播給 200 支手機！
+    if (hostSocketId) {
+      io.to(hostSocketId).emit('leaderboard_update', getTop20Leaderboard());
+    }
   });
 
   // 主機公布答案

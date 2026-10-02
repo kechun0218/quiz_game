@@ -250,6 +250,7 @@
 
  <script>
   const socket = io();
+  socket.emit('register_as_host');
   let currentTimer = null;
 
   // 🌟 1. 優先綁定名單更新事件（無論何時收到名單都會立刻畫出來）
